@@ -41,8 +41,8 @@ header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:
 .feedback.ok{color:var(--green)}.feedback.bad{color:var(--red)}
 
 .stage{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 8px}
-.staffwrap{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:flex-start;
-  border:1px solid #d7d2c4;border-radius:14px;margin:2px 6px;background:#FBFBF6;overflow:hidden}
+.staffwrap{position:relative;flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:flex-start;
+  border:1px solid #d7d2c4;border-radius:14px;margin:2px 6px;background:#FBFBF6;overflow:auto}
 svg.staff{width:100%;display:block;direction:ltr}
 .zoomctl{position:absolute;top:8px;inset-inline-end:10px;display:flex;gap:6px;z-index:4}
 .zoomctl button{width:30px;height:30px;border-radius:8px;border:1px solid #cfc9ba;background:#fff;color:#222;font-size:18px;font-weight:800;cursor:pointer;line-height:1}
@@ -285,9 +285,7 @@ const COL={ink:'#16202b',active:'#1565C0',wrong:'#D32F2F',done:'#AEB4BA',line:'#
 function layout(){
   const Z=state.zoom;
   W=staff.clientWidth||staff.parentElement.clientWidth||720;
-  const wrapH=(staff.parentElement&&staff.parentElement.clientHeight)||240;
-  const want=16*Z, maxG=Math.max(9,(wrapH-6)/13.4);   // cap so total height fits the card
-  GAP=Math.min(want,maxG); STEP=GAP/2;
+  GAP=16*Z; STEP=GAP/2;
   STAFF_TOP=GAP*4.4; H=GAP*13.4;
   headRx=GAP*0.62; headRy=GAP*0.46; stemLen=GAP*3.4;
   clefW=GAP*4.2;
@@ -394,11 +392,13 @@ function buildKeyboardWindow(lo,hi){
     const k=document.createElement('div');k.className='bkey';k.style.left=(idx*ww+ww*0.65)+'px';k.style.width=(ww*0.7)+'px';
     k.dataset.midi=m;bindKey(k,m);keysEl.appendChild(k);keyByMidi[m]=k;}
 }
+function kbOctaves(){const cw=(document.querySelector('.kbdscroll').clientWidth)||window.innerWidth||700;return Math.max(2,Math.min(4,Math.round(cw/(7*64))));}
 function windowFor(midis){
+  const span=kbOctaves()*12;
   const tmin=Math.min(...midis),tmax=Math.max(...midis),mid=(tmin+tmax)/2;
-  let lo=Math.floor((mid-12)/12)*12; lo=Math.max(24,Math.min(84,lo)); let hi=lo+24;
-  if(tmin<lo){lo=Math.max(24,Math.floor(tmin/12)*12);hi=lo+24;}
-  if(tmax>hi){hi=Math.min(108,Math.ceil((tmax+1)/12)*12);lo=hi-24;if(lo<24){lo=24;hi=48;}}
+  let lo=Math.floor((mid-span/2)/12)*12; lo=Math.max(24,Math.min(108-span,lo)); let hi=lo+span;
+  if(tmin<lo){lo=Math.max(24,Math.floor(tmin/12)*12);hi=lo+span;}
+  if(tmax>hi){hi=Math.min(108,Math.ceil((tmax+1)/12)*12);lo=hi-span;if(lo<24){lo=24;hi=24+span;}}
   return{lo,hi};
 }
 function updateKeyboard(){
