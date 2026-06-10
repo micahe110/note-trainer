@@ -41,8 +41,8 @@ header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:
 .feedback.ok{color:var(--green)}.feedback.bad{color:var(--red)}
 
 .stage{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 8px}
-.staffwrap{position:relative;flex:1;min-height:0;display:flex;align-items:flex-start;justify-content:flex-start;
-  border:1px solid #d7d2c4;border-radius:14px;margin:2px 6px;background:#FBFBF6;overflow:auto}
+.staffwrap{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:flex-start;
+  border:1px solid #d7d2c4;border-radius:14px;margin:2px 6px;background:#FBFBF6;overflow:hidden}
 svg.staff{width:100%;display:block;direction:ltr}
 .zoomctl{position:absolute;top:8px;inset-inline-end:10px;display:flex;gap:6px;z-index:4}
 .zoomctl button{width:30px;height:30px;border-radius:8px;border:1px solid #cfc9ba;background:#fff;color:#222;font-size:18px;font-weight:800;cursor:pointer;line-height:1}
@@ -224,7 +224,7 @@ const state={
   range:{treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C4',hi:'C5'},beginners:{lo:'C4',hi:'C5'}},
   beginnerNotes:[60,62,64,65,67,69,71,72],
   key:0, scale:'free', chordStyle:'classic',
-  nameStyle:'solfege', sharps:false, octave:true, perRound:6, zoom:1.1,
+  nameStyle:'solfege', sharps:false, octave:true, perRound:6, zoom:1.0,
   latch:false, hintKeys:true,
   seq:[], cur:0, wrong:false, correctInRound:0, round:1
 };
@@ -283,14 +283,15 @@ let W=720,H=240,STAFF_TOP=60,GAP=16,STEP=8,headRx=10,headRy=7,stemLen=52,clefW=7
 const COL={ink:'#16202b',active:'#1565C0',wrong:'#D32F2F',done:'#AEB4BA',line:'#4a4a4a',ledger:'#5a5a5a'};
 
 function layout(){
-  const Z=state.zoom;
   W=staff.clientWidth||staff.parentElement.clientWidth||720;
-  GAP=16*Z; STEP=GAP/2;
+  const wrapH=(staff.parentElement&&staff.parentElement.clientHeight)||240;
+  GAP=Math.max(8,wrapH/13.4);            // staff fills the card height -> big, clean notes (no scroll)
+  STEP=GAP/2;
   STAFF_TOP=GAP*4.4; H=GAP*13.4;
   headRx=GAP*0.62; headRy=GAP*0.46; stemLen=GAP*3.4;
-  clefW=GAP*4.2;
-  readingX=Math.max(GAP*4.5,Math.min(GAP*7,W*0.24));
-  spacing=GAP*3.8;
+  clefW=GAP*3.8;
+  readingX=clefW+GAP*3.0;                // clear of the clef
+  spacing=GAP*3.2*state.zoom;            // zoom = how spread out the notes are (fewer when bigger)
   staff.setAttribute('viewBox',`0 0 ${W} ${H}`);
   staff.style.height=H+'px';
 }
@@ -316,7 +317,7 @@ function drawStatic(){
   for(let i=0;i<5;i++)staff.appendChild(el('line',{x1:10,x2:W-6,y1:lineY(i),y2:lineY(i),stroke:COL.line,'stroke-width':1.4}));
   const bass=state.mode==='bass';
   const cy=bass?lineY(1)+GAP*0.4:lineY(2)+GAP*1.4;
-  const c=el('text',{x:GAP*0.9,y:cy,'font-size':bass?GAP*4:GAP*6,fill:COL.ink});
+  const c=el('text',{x:GAP*0.7,y:cy,'font-size':bass?GAP*3.6:GAP*5.2,fill:COL.ink});
   c.textContent=bass?'\uD834\uDD22':'\uD834\uDD1E';staff.appendChild(c);
   staff.appendChild(el('g',{id:'notes','clip-path':'url(#nc)'}));
 }
@@ -392,7 +393,7 @@ function buildKeyboardWindow(lo,hi){
     const k=document.createElement('div');k.className='bkey';k.style.left=(idx*ww+ww*0.65)+'px';k.style.width=(ww*0.7)+'px';
     k.dataset.midi=m;bindKey(k,m);keysEl.appendChild(k);keyByMidi[m]=k;}
 }
-function kbOctaves(){const cw=(document.querySelector('.kbdscroll').clientWidth)||window.innerWidth||700;return Math.max(2,Math.min(4,Math.round(cw/(7*64))));}
+function kbOctaves(){const cw=(document.querySelector('.kbdscroll').clientWidth)||window.innerWidth||700;return Math.max(2,Math.min(4,Math.round(cw/322)));}
 function windowFor(midis){
   const span=kbOctaves()*12;
   const tmin=Math.min(...midis),tmax=Math.max(...midis),mid=(tmin+tmax)/2;
@@ -494,8 +495,8 @@ document.getElementById('octaveChk').addEventListener('change',e=>{state.octave=
 document.getElementById('perRound').addEventListener('change',e=>{state.perRound=Math.max(2,Math.min(40,+e.target.value||6));state.correctInRound=0;save();updateProgress();});
 document.getElementById('latchChk').addEventListener('change',e=>{state.latch=e.target.checked;held.clear();});
 document.getElementById('hintKeysChk').addEventListener('change',e=>{state.hintKeys=e.target.checked;save();updateKeyboard();});
-document.getElementById('zoomIn').addEventListener('click',()=>{state.zoom=Math.min(2.2,state.zoom+0.15);save();drawStatic();render(false);});
-document.getElementById('zoomOut').addEventListener('click',()=>{state.zoom=Math.max(0.7,state.zoom-0.15);save();drawStatic();render(false);});
+document.getElementById('zoomIn').addEventListener('click',()=>{state.zoom=Math.min(2.6,state.zoom+0.2);save();render(false);});
+document.getElementById('zoomOut').addEventListener('click',()=>{state.zoom=Math.max(0.6,state.zoom-0.2);save();render(false);});
 
 let rt;addEventListener('resize',()=>{clearTimeout(rt);rt=setTimeout(()=>{drawStatic();render(false);buildKeyboardWindow(kbLo,kbHi);updateKeyboard();},120);});
 
