@@ -42,7 +42,7 @@ header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:
 
 .stage{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 8px}
 .staffwrap{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:flex-start;
-  border:1px solid #d7d2c4;border-radius:14px;margin:2px 6px;background:#FBFBF6;overflow:auto}
+  border:1px solid #d7d2c4;border-radius:14px;margin:2px 6px;background:#FBFBF6;overflow:hidden}
 svg.staff{width:100%;display:block;direction:ltr}
 .zoomctl{position:absolute;top:8px;inset-inline-end:10px;display:flex;gap:6px;z-index:4}
 .zoomctl button{width:30px;height:30px;border-radius:8px;border:1px solid #cfc9ba;background:#fff;color:#222;font-size:18px;font-weight:800;cursor:pointer;line-height:1}
@@ -214,7 +214,7 @@ const STYLE_QUAL={basic:['maj','min'],classic:['maj','min','dim','aug'],pop:['ma
 /* ===== state ===== */
 const state={
   mode:'treble',
-  range:{treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C3',hi:'C4'}},
+  range:{treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C4',hi:'C5'}},
   key:0, scale:'free', chordStyle:'classic',
   nameStyle:'solfege', sharps:false, octave:true, perRound:6, zoom:1.1,
   latch:false, hintKeys:true,
@@ -270,9 +270,11 @@ const COL={ink:'#16202b',active:'#1565C0',wrong:'#D32F2F',done:'#AEB4BA',line:'#
 
 function layout(){
   const Z=state.zoom;
-  GAP=16*Z; STEP=GAP/2;
   W=staff.clientWidth||staff.parentElement.clientWidth||720;
-  STAFF_TOP=GAP*3.6; H=STAFF_TOP+GAP*4+GAP*3;
+  const wrapH=(staff.parentElement&&staff.parentElement.clientHeight)||240;
+  const want=16*Z, maxG=Math.max(9,(wrapH-6)/13.4);   // cap so total height fits the card
+  GAP=Math.min(want,maxG); STEP=GAP/2;
+  STAFF_TOP=GAP*4.4; H=GAP*13.4;
   headRx=GAP*0.62; headRy=GAP*0.46; stemLen=GAP*3.4;
   clefW=GAP*4.2;
   readingX=Math.max(GAP*4.5,Math.min(GAP*7,W*0.24));
@@ -322,10 +324,13 @@ function render(animate){
       g.appendChild(el('ellipse',{cx:x,cy:y,rx:headRx,ry:headRy,fill,transform:`rotate(-20 ${x} ${y})`}));
     });
     const yTop=Math.min(...ys),yBot=Math.max(...ys);
-    g.appendChild(el('line',{x1:x+headRx*0.92,x2:x+headRx*0.92,y1:yBot,y2:yTop-stemLen,stroke:fill,'stroke-width':Math.max(1.8,GAP*0.11)}));
+    const stemUp=((yTop+yBot)/2)>=lineY(2);
+    const sx=x+(stemUp?headRx*0.92:-headRx*0.92);
+    g.appendChild(el('line',{x1:sx,x2:sx,y1:stemUp?yBot:yTop,y2:stemUp?yTop-stemLen:yBot+stemLen,stroke:fill,'stroke-width':Math.max(1.8,GAP*0.11)}));
     if(it.type==='chord'){
-      const ny=Math.max(GAP*1,yTop-stemLen-GAP*0.5);
-      const t=el('text',{x:x+headRx*0.4,y:ny,'text-anchor':'middle','font-size':GAP*1.05,'font-weight':800,fill,'font-family':"'JetBrains Mono',monospace"});
+      const topMost=stemUp?yTop-stemLen:yTop;
+      const ny=Math.max(GAP*1.0,topMost-GAP*0.7);
+      const t=el('text',{x,y:ny,'text-anchor':'middle','font-size':GAP*1.05,'font-weight':800,fill,'font-family':"'JetBrains Mono',monospace"});
       t.textContent=it.label;g.appendChild(t);
     }else if(state.nameStyle!=='off'&&it.label){
       const t=el('text',{x,y:lineY(4)+GAP*1.9,'text-anchor':'middle','font-size':GAP*0.95,'font-weight':700,fill:i===state.cur?fill:COL.done,'font-family':"'JetBrains Mono',monospace"});
