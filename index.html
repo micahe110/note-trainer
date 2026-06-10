@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0E2233">
+<title>מאמן תווים — פסנתר</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E2233; --bg2:#0B1B2A;
+  --panel:#15334C; --panel2:#1B405E;
+  --ink:#ECF3F4;          /* note color */
+  --line:#3E6B86;         /* staff lines */
+  --muted:#7E9AB0;        /* done notes / secondary text */
+  --accent:#F4B740;       /* active note + reading line (drafting pencil) */
+  --cyan:#59D2E0;         /* ui accent */
+  --green:#4FD08A;        /* success */
+  --red:#FF5A4D;          /* error */
+  --kbd-white:#E9EEF0; --kbd-white-d:#C2CDD2;
+  --kbd-black:#16242F;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%}
+body{
+  background:
+    linear-gradient(transparent 0,transparent calc(100% - 1px),rgba(89,210,224,.05) 100%),
+    linear-gradient(90deg,transparent 0,transparent calc(100% - 1px),rgba(89,210,224,.05) 100%);
+  background-size:28px 28px;
+  background-color:var(--bg);
+  color:var(--ink);
+  font-family:'Heebo',system-ui,'Segoe UI',Arial,sans-serif;
+  display:flex;flex-direction:column;height:100dvh;overflow:hidden;
+}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+/* ---------- top bar ---------- */
+header{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-bottom:1px solid rgba(89,210,224,.18);
+  background:linear-gradient(180deg,var(--bg2),transparent);
+}
+.brand{font-weight:800;font-size:17px;letter-spacing:.2px;white-space:nowrap}
+.brand b{color:var(--accent)}
+.tabs{display:flex;gap:6px;margin-inline-start:auto;flex-wrap:wrap}
+.tab{
+  border:1px solid rgba(89,210,224,.25);background:transparent;color:var(--muted);
+  font-family:inherit;font-weight:700;font-size:13px;padding:7px 12px;border-radius:999px;cursor:pointer;
+  transition:.15s;
+}
+.tab[aria-selected="true"]{background:var(--cyan);color:#06222b;border-color:var(--cyan)}
+.iconbtn{
+  border:1px solid rgba(89,210,224,.25);background:transparent;color:var(--ink);
+  width:38px;height:38px;border-radius:10px;cursor:pointer;font-size:18px;display:grid;place-items:center;
+}
+.iconbtn:active{background:var(--panel)}
+
+/* ---------- status row ---------- */
+.statusbar{display:flex;align-items:center;gap:10px;padding:8px 14px;flex-wrap:wrap}
+.chip{
+  display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+  padding:5px 10px;border-radius:999px;background:var(--panel);color:var(--muted);
+  border:1px solid rgba(255,255,255,.05);
+}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.chip.on{color:var(--green)} .chip.on .dot{background:var(--green);box-shadow:0 0 8px var(--green)}
+.chip.off .dot{background:var(--red)}
+.feedback{margin-inline-start:auto;font-weight:700;font-size:14px;min-height:20px}
+.feedback.ok{color:var(--green)} .feedback.bad{color:var(--red)}
+
+/* ---------- staff ---------- */
+.stage{flex:1;min-height:0;display:flex;flex-direction:column;padding:0 8px}
+.staffwrap{
+  position:relative;flex:1;min-height:0;display:flex;align-items:center;
+  border:1px solid rgba(89,210,224,.14);border-radius:14px;margin:2px 6px;
+  background:linear-gradient(180deg,rgba(27,64,94,.35),rgba(11,27,42,.35));
+  overflow:hidden;
+}
+svg.staff{width:100%;height:220px;display:block;direction:ltr}
+.note-head{transition:fill .12s}
+.progress{height:6px;background:var(--panel);border-radius:999px;margin:10px 18px 4px;overflow:hidden}
+.progress > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--cyan),var(--accent));border-radius:999px;transition:width .3s}
+.roundinfo{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin:0 18px}
+
+/* ---------- keyboard ---------- */
+.kbdbar{padding:8px 10px 12px;border-top:1px solid rgba(89,210,224,.18);background:linear-gradient(0deg,var(--bg2),transparent)}
+.kbdtools{display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:12.5px;color:var(--muted)}
+.toggle{display:inline-flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--cyan);width:16px;height:16px}
+.kbdscroll{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch}
+.keys{position:relative;height:120px;touch-action:none;user-select:none}
+.wkey{
+  position:absolute;top:0;height:100%;border:1px solid var(--kbd-white-d);border-top:none;
+  background:linear-gradient(180deg,var(--kbd-white),var(--kbd-white-d));border-radius:0 0 6px 6px;
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:7px;
+  color:#3a4a52;font-size:10px;font-weight:700;
+}
+.bkey{
+  position:absolute;top:0;height:62%;border-radius:0 0 4px 4px;z-index:3;
+  background:linear-gradient(180deg,#243643,var(--kbd-black));border:1px solid #000;
+}
+.wkey.down{background:linear-gradient(180deg,#bfe7ec,#8fd2da)}
+.bkey.down{background:linear-gradient(180deg,#2d6f78,#1c4b52)}
+.wkey.hint{box-shadow:inset 0 -6px 0 var(--accent)}
+.bkey.hint{box-shadow:inset 0 -6px 0 var(--accent)}
+
+/* ---------- settings drawer ---------- */
+.overlay{position:fixed;inset:0;background:rgba(4,12,20,.55);backdrop-filter:blur(2px);display:none;z-index:20}
+.overlay.open{display:block}
+.drawer{
+  position:fixed;top:0;inset-inline-end:0;height:100dvh;width:min(420px,92vw);z-index:21;
+  background:var(--bg);border-inline-start:1px solid rgba(89,210,224,.25);
+  transform:translateX(100%);transition:transform .25s ease;overflow-y:auto;padding:18px 18px 40px;
+}
+[dir=rtl] .drawer{transform:translateX(-100%)}
+.drawer.open{transform:translateX(0)!important}
+.drawer h2{margin:0 0 4px;font-size:18px}
+.drawer .sub{color:var(--muted);font-size:13px;margin-bottom:18px}
+.field{margin-bottom:16px}
+.field label{display:block;font-weight:700;font-size:13px;margin-bottom:6px}
+.field .hint{color:var(--muted);font-size:11.5px;font-weight:400;margin-top:4px}
+select,input[type=number]{
+  width:100%;background:var(--panel);color:var(--ink);border:1px solid rgba(89,210,224,.22);
+  border-radius:10px;padding:10px;font-family:inherit;font-size:14px;
+}
+.row2{display:flex;gap:10px}.row2>*{flex:1}
+.seg{display:flex;background:var(--panel);border-radius:10px;padding:4px;gap:4px}
+.seg button{flex:1;border:none;background:transparent;color:var(--muted);font-family:inherit;font-weight:700;font-size:13px;padding:8px;border-radius:7px;cursor:pointer}
+.seg button.sel{background:var(--cyan);color:#06222b}
+.closebtn{position:sticky;top:0;float:inline-end;margin:-6px -6px 0 0;border:none;background:transparent;color:var(--muted);font-size:24px;cursor:pointer}
+.mode-only{display:none}
+hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">מאמן <b>תווים</b></div>
+  <div class="tabs" role="tablist">
+    <button class="tab" data-mode="treble" role="tab" aria-selected="true">מפתח סול</button>
+    <button class="tab" data-mode="bass"   role="tab" aria-selected="false">מפתח פה</button>
+    <button class="tab" data-mode="chords" role="tab" aria-selected="false">אקורדים</button>
+  </div>
+  <button class="iconbtn" id="gear" aria-label="הגדרות">⚙︎</button>
+</header>
+
+<div class="statusbar">
+  <span class="chip off" id="connChip"><span class="dot"></span><span id="connText">לא מחובר — נגן במקלדת שלמטה</span></span>
+  <span class="feedback" id="feedback"></span>
+</div>
+
+<main class="stage">
+  <div class="staffwrap">
+    <svg class="staff" id="staff" preserveAspectRatio="xMinYMid meet"></svg>
+  </div>
+  <div class="progress"><i id="progBar"></i></div>
+  <div class="roundinfo"><span id="roundLabel">סבב 1</span><span id="countLabel">0 / 6</span></div>
+</main>
+
+<div class="kbdbar">
+  <div class="kbdtools">
+    <label class="toggle"><input type="checkbox" id="latchChk"> מצב נעילה (לבדיקת אקורדים בעכבר)</label>
+    <label class="toggle" style="margin-inline-start:auto"><input type="checkbox" id="hintKeysChk" checked> הדגש את הקליד הנכון</label>
+  </div>
+  <div class="kbdscroll"><div class="keys" id="keys"></div></div>
+</div>
+
+<!-- settings -->
+<div class="overlay" id="overlay"></div>
+<aside class="drawer" id="drawer">
+  <button class="closebtn" id="closeSettings">×</button>
+  <h2>הגדרות</h2>
+  <div class="sub">בחר מכשיר, טווח תווים וכמות לכל סבב.</div>
+
+  <div class="field">
+    <label>מכשיר MIDI (פסנתר)</label>
+    <div class="row2">
+      <select id="midiSelect"><option value="">— אין מכשירים —</option></select>
+      <button class="iconbtn" id="midiRefresh" aria-label="רענון" style="width:auto;padding:0 14px">חבר / רענן</button>
+    </div>
+    <div class="hint" id="midiHint">חבר את הפסנתר בכבל USB‑C (OTG) או Bluetooth‑MIDI, ואז לחץ "חבר / רענן".</div>
+  </div>
+
+  <hr class="div">
+
+  <div class="field">
+    <label>טווח תווים</label>
+    <div class="row2">
+      <div><div class="hint" style="margin:0 0 4px">מהנמוך</div><select id="rangeLo"></select></div>
+      <div><div class="hint" style="margin:0 0 4px">עד הגבוה</div><select id="rangeHi"></select></div>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>שמות התווים מתחת לתו</label>
+    <div class="seg" id="nameStyle">
+      <button data-v="solfege" class="sel">דו‑רה‑מי</button>
+      <button data-v="letters">A‑B‑C</button>
+      <button data-v="off">בלי</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="toggle"><input type="checkbox" id="sharpsChk"> כלול דיאזים (קלידים שחורים) ♯</label>
+  </div>
+  <div class="field">
+    <label class="toggle"><input type="checkbox" id="octaveChk" checked> דרוש אוקטבה מדויקת</label>
+    <div class="hint">כבוי = מספיק לנגן את התו הנכון בכל אוקטבה.</div>
+  </div>
+
+  <div class="field mode-only" data-mode="chords">
+    <label>סוגי אקורדים</label>
+    <div class="seg" id="chordQ">
+      <button data-v="maj" class="sel">מז'ור</button>
+      <button data-v="min" class="sel">מינור</button>
+      <button data-v="both" class="sel">שניהם</button>
+    </div>
+  </div>
+
+  <hr class="div">
+
+  <div class="field">
+    <label>תווים בכל סבב</label>
+    <input type="number" id="perRound" min="2" max="40" value="6">
+    <div class="hint">אחרי כמות זו פס ההתקדמות מתאפס ומתחיל סבב חדש.</div>
+  </div>
+</aside>
+
+<script>
+/* =========================================================
+   נתוני מוזיקה בסיסיים
+   ========================================================= */
+const SEMI = {C:0,D:2,E:4,F:5,G:7,A:9,B:11};
+const LETTERS = ['C','D','E','F','G','A','B'];
+const SOLFEGE = {C:'דו',D:'רה',E:'מי',F:'פה',G:'סול',A:'לה',B:'סי'};
+const SHARP_SPELL = [ // pitch-class -> spelling
+ {l:'C',a:0},{l:'C',a:1},{l:'D',a:0},{l:'D',a:1},{l:'E',a:0},{l:'F',a:0},
+ {l:'F',a:1},{l:'G',a:0},{l:'G',a:1},{l:'A',a:0},{l:'A',a:1},{l:'B',a:0}];
+
+const midiOf = (l,o,a=0)=> (o+1)*12 + SEMI[l] + a;
+const dindex = (l,o)=> o*7 + LETTERS.indexOf(l);
+const fromDindex = d => ({l:LETTERS[((d%7)+7)%7], o:Math.floor(d/7)});
+
+function nameFor(g){
+  if(state.nameStyle==='off') return '';
+  const base = state.nameStyle==='solfege' ? SOLFEGE[g.l] : g.l;
+  return base + (g.a? '♯':'');
+}
+
+/* =========================================================
+   מצב האפליקציה
+   ========================================================= */
+const state = {
+  mode:'treble',
+  range:{ treble:{lo:'C4',hi:'G5'}, bass:{lo:'C2',hi:'C4'}, chords:{lo:'C3',hi:'C4'} },
+  perRound:6, nameStyle:'solfege', sharps:false, octave:true, chordQ:'both',
+  latch:false, hintKeys:true,
+  seq:[], cur:0, wrong:false, correctInRound:0, round:1,
+};
+const TOPDPOS = {treble:38, bass:26}; // diatonic index of the top staff line
+
+/* parse "C4" */
+function parseNote(s){ const m=s.match(/^([A-G])(\d)$/); return {l:m[1],o:+m[2]}; }
+
+/* =========================================================
+   יצירת תווים אקראיים
+   ========================================================= */
+function rint(a,b){ return a + Math.floor(Math.random()*(b-a+1)); }
+
+function spell(midi){
+  const pc = ((midi%12)+12)%12, o = Math.floor(midi/12)-1, s = SHARP_SPELL[pc];
+  return {l:s.l, o, a:s.a, dpos:dindex(s.l,o), midi};
+}
+
+function genSingle(){
+  const m = state.mode==='chords' ? 'treble' : state.mode;
+  const lo = parseNote(state.range[m].lo), hi = parseNote(state.range[m].hi);
+  let g;
+  if(state.sharps){
+    const m1 = midiOf(lo.l,lo.o), m2 = midiOf(hi.l,hi.o);
+    g = spell(rint(m1,m2));
+  } else {
+    const d = rint(dindex(lo.l,lo.o), dindex(hi.l,hi.o));
+    const p = fromDindex(d);
+    g = {l:p.l,o:p.o,a:0,dpos:d,midi:midiOf(p.l,p.o)};
+  }
+  return {type:'note', glyphs:[g], midis:[g.midi], label:nameFor(g)};
+}
+
+function genChord(){
+  const lo = parseNote(state.range.chords.lo), hi = parseNote(state.range.chords.hi);
+  const dLo=dindex(lo.l,lo.o), dHi=dindex(hi.l,hi.o);
+  const dRoot = rint(dLo,dHi);
+  const root = fromDindex(dRoot);
+  let qual = state.chordQ;
+  if(qual==='both') qual = Math.random()<.5?'maj':'min';
+  const third = qual==='maj'?4:3;
+  const rootMidi = midiOf(root.l,root.o);
+  const midis = [rootMidi, rootMidi+third, rootMidi+7];
+  const glyphs = midis.map(spell);
+  // spell the third/fifth diatonically when natural-friendly: keep stacked thirds look
+  glyphs[0] = {l:root.l,o:root.o,a:0,dpos:dRoot,midi:rootMidi};
+  const lbl = (state.nameStyle==='solfege'?SOLFEGE[root.l]:root.l) + (qual==='min'?'m':'');
+  return {type:'chord', glyphs, midis, label:lbl};
+}
+
+function genNote(){ return state.mode==='chords' ? genChord() : genSingle(); }
+
+function refill(){
+  const need = state.cur + lookahead() + 3;
+  while(state.seq.length < need) state.seq.push(genNote());
+}
+
+function resetSeq(){
+  state.seq=[]; state.cur=0; state.wrong=false; state.correctInRound=0; state.round=1;
+  refill(); render(false); updateProgress();
+}
+
+/* =========================================================
+   גיאומטריה + ציור על החמשה
+   ========================================================= */
+const SVG='http://www.w3.org/2000/svg';
+const staff = document.getElementById('staff');
+let W=720, H=220, STAFF_TOP=70, GAP=15, STEP=7.5, clefW=70, readingX=120, spacing=82;
+
+function layout(){
+  W = staff.clientWidth || 720;
+  staff.setAttribute('viewBox',`0 0 ${W} ${H}`);
+  readingX = Math.min(120, Math.max(96, W*0.26));
+  spacing  = Math.max(60, Math.min(86, (W-readingX-20)/4.4));
+}
+function lookahead(){ return Math.max(2, Math.floor((W - readingX) / spacing)); }
+
+const lineY = i => STAFF_TOP + i*GAP;            // i=0 top line .. 4 bottom line
+const yForDpos = dpos => STAFF_TOP + (TOPDPOS[state.mode==='chords'?'treble':state.mode] - dpos) * STEP;
+
+function el(tag,attrs){ const e=document.createElementNS(SVG,tag); for(const k in attrs) e.setAttribute(k,attrs[k]); return e; }
+
+function ledgersFor(g, x, parent){
+  const y = yForDpos(g.dpos);
+  const top=lineY(0), bot=lineY(4);
+  if(y < top-2){ for(let k=-1; lineY(k) >= y-1; k--) parent.appendChild(el('line',{x1:x-15,x2:x+15,y1:lineY(k),y2:lineY(k),stroke:'var(--line)','stroke-width':1.4})); }
+  if(y > bot+2){ for(let k=5;  lineY(k) <= y+1; k++) parent.appendChild(el('line',{x1:x-15,x2:x+15,y1:lineY(k),y2:lineY(k),stroke:'var(--line)','stroke-width':1.4})); }
+}
+
+function drawStatic(){
+  layout();
+  // clear & redraw fixed layer (staff lines, clef, reading line)
+  staff.innerHTML='';
+  // clip so scrolling notes hide behind the clef area
+  const defs=el('defs',{}); 
+  const clip=el('clipPath',{id:'notesClip'});
+  clip.appendChild(el('rect',{x:clefW, y:0, width:W, height:H})); defs.appendChild(clip); staff.appendChild(defs);
+
+  // reading line glow
+  const rl=el('rect',{id:'readLine', x:readingX-22, y:lineY(0)-10, width:44, height:GAP*4+20, rx:8,
+    fill:'rgba(244,183,64,.10)', stroke:'rgba(244,183,64,.5)','stroke-width':1.2}); staff.appendChild(rl);
+
+  // staff lines
+  for(let i=0;i<5;i++) staff.appendChild(el('line',{x1:14,x2:W-8,y1:lineY(i),y2:lineY(i),stroke:'var(--line)','stroke-width':1.4}));
+
+  // clef glyph (unicode) – tab already names the clef, this is decorative
+  const cy = state.mode==='bass' ? lineY(1)+6 : lineY(2)+22;
+  const glyph = state.mode==='bass' ? '\uD834\uDD22' : '\uD834\uDD1E';
+  const c=el('text',{x:26,y:cy,'font-size':state.mode==='bass'?64:96,fill:'var(--ink)'}); c.textContent=glyph; staff.appendChild(c);
+
+  // scrolling group for notes
+  const g=el('g',{id:'notes','clip-path':'url(#notesClip)'}); staff.appendChild(g);
+}
+
+function noteHead(x,y,cls,fill){
+  const h=el('ellipse',{cx:x,cy:y,rx:8.5,ry:6.4,fill,transform:`rotate(-20 ${x} ${y})`,class:'note-head '+cls});
+  return h;
+}
+
+function colorFor(i){
+  if(i < state.cur) return 'var(--muted)';
+  if(i === state.cur) return state.wrong ? 'var(--red)' : 'var(--accent)';
+  return 'var(--ink)';
+}
+
+function render(animate){
+  layout();
+  if(!document.getElementById('notes')) drawStatic();
+  const notesG = document.getElementById('notes');
+  notesG.innerHTML='';
+  const start = Math.max(0, state.cur-2), end = state.cur + lookahead();
+  for(let i=start;i<=end && i<state.seq.length;i++){
+    const item=state.seq[i];
+    const x = readingX + (i-state.cur)*spacing;
+    const fill = colorFor(i);
+    // ledger lines + heads
+    item.glyphs.forEach(g=>{
+      ledgersFor(g,x,notesG);
+      const y=yForDpos(g.dpos);
+      if(g.a){ const sh=el('text',{x:x-17,y:y+5,'font-size':18,fill,'font-weight':700}); sh.textContent='♯'; notesG.appendChild(sh); }
+      notesG.appendChild(noteHead(x,y,'',fill));
+    });
+    // stem (single notes & chords)
+    const ys = item.glyphs.map(g=>yForDpos(g.dpos));
+    const yTop=Math.min(...ys), yBot=Math.max(...ys);
+    notesG.appendChild(el('line',{x1:x+8,x2:x+8,y1:yTop-30,y2:yBot,stroke:fill,'stroke-width':2}));
+    // label under staff
+    if(state.nameStyle!=='off' && item.label){
+      const t=el('text',{x:x, y:lineY(4)+30,'text-anchor':'middle','font-size':15,'font-weight':700,
+        fill: i===state.cur ? (state.wrong?'var(--red)':'var(--accent)') : 'var(--muted)',
+        'font-family':"'JetBrains Mono',monospace"});
+      t.textContent=item.label; notesG.appendChild(t);
+    }
+  }
+  // reading line color
+  const rl=document.getElementById('readLine');
+  if(rl){ const on=state.wrong; rl.setAttribute('stroke', on?'rgba(255,90,77,.7)':'rgba(244,183,64,.5)');
+    rl.setAttribute('fill', on?'rgba(255,90,77,.10)':'rgba(244,183,64,.10)'); }
+
+  if(animate){
+    notesG.style.transition='none'; notesG.style.transform=`translateX(${spacing}px)`;
+    notesG.getBoundingClientRect();
+    notesG.style.transition='transform .24s ease'; notesG.style.transform='translateX(0)';
+  }
+  highlightKeys();
+}
+
+/* =========================================================
+   לוגיקת קלט (נכון / טעות / התקדמות)
+   ========================================================= */
+const held = new Set();
+let fbTimer;
+function feedback(txt,cls){ const f=document.getElementById('feedback'); f.textContent=txt; f.className='feedback '+(cls||''); clearTimeout(fbTimer); fbTimer=setTimeout(()=>{f.textContent='';f.className='feedback';},900); }
+
+function matchSingle(midi){
+  const t=state.seq[state.cur].midis[0];
+  return state.octave ? midi===t : (midi%12)===(t%12);
+}
+function chordSatisfied(){
+  const target=state.seq[state.cur].midis;
+  if(state.octave){
+    return target.every(t=>held.has(t)) && held.size===target.length;
+  } else {
+    const tp=new Set(target.map(x=>x%12)), hp=new Set([...held].map(x=>x%12));
+    return [...tp].every(x=>hp.has(x)) && hp.size===tp.size;
+  }
+}
+function advance(){
+  state.cur++; state.wrong=false; refill();
+  state.correctInRound++;
+  if(state.correctInRound>=state.perRound){ state.correctInRound=0; state.round++; feedback('סבב הושלם! ✓','ok'); }
+  render(true); updateProgress();
+}
+function noteOn(midi){
+  setKeyVisual(midi,true);
+  if(state.mode==='chords'){
+    held.add(midi);
+    if(chordSatisfied()){ feedback('אקורד נכון ✓','ok'); held.clear(); advance(); }
+  } else {
+    if(matchSingle(midi)){ feedback('נכון ✓','ok'); advance(); }
+    else { state.wrong=true; feedback('נסה שוב','bad'); render(false); }
+  }
+}
+function noteOff(midi){ setKeyVisual(midi,false); held.delete(midi); }
+
+function updateProgress(){
+  document.getElementById('progBar').style.width=(state.correctInRound/state.perRound*100)+'%';
+  document.getElementById('roundLabel').textContent='סבב '+state.round;
+  document.getElementById('countLabel').textContent=state.correctInRound+' / '+state.perRound;
+}
+
+/* =========================================================
+   מקלדת על המסך (מגע / עכבר / מולטי-טאץ')
+   ========================================================= */
+const KB_LO=midiOf('C',2), KB_HI=midiOf('C',6);
+const keysEl=document.getElementById('keys');
+const keyByMidi={};
+function isBlack(m){ return [1,3,6,8,10].includes(((m%12)+12)%12); }
+
+function buildKeyboard(){
+  keysEl.innerHTML=''; for(const k in keyByMidi) delete keyByMidi[k];
+  const ww=34, whites=[];
+  for(let m=KB_LO;m<=KB_HI;m++) if(!isBlack(m)) whites.push(m);
+  keysEl.style.width=(whites.length*ww)+'px';
+  whites.forEach((m,idx)=>{
+    const k=el2('div','wkey'); k.style.left=(idx*ww)+'px'; k.style.width=ww+'px';
+    const p=spell(m); k.textContent=p.l+p.o; k.dataset.midi=m; bindKey(k,m); keysEl.appendChild(k); keyByMidi[m]=k;
+  });
+  // black keys
+  for(let m=KB_LO;m<=KB_HI;m++) if(isBlack(m)){
+    const leftWhite=m-1; const idx=whites.indexOf(leftWhite); if(idx<0) continue;
+    const k=el2('div','bkey'); k.style.left=(idx*ww+ww*0.66)+'px'; k.style.width=(ww*0.66)+'px';
+    k.dataset.midi=m; bindKey(k,m); keysEl.appendChild(k); keyByMidi[m]=k;
+  }
+}
+function el2(tag,cls){ const e=document.createElement(tag); e.className=cls; return e; }
+function bindKey(k,m){
+  k.addEventListener('pointerdown',e=>{ e.preventDefault();
+    if(state.latch){ if(held.has(m)){ noteOff(m); } else { noteOn(m); } }
+    else { noteOn(m); }
+  });
+  if(!state.latch){
+    ['pointerup','pointercancel','pointerleave'].forEach(ev=>k.addEventListener(ev,()=>{ if(!state.latch) noteOff(m); }));
+  }
+}
+function setKeyVisual(m,down){ const k=keyByMidi[m]; if(k) k.classList.toggle('down',down); }
+function highlightKeys(){
+  Object.values(keyByMidi).forEach(k=>k.classList.remove('hint'));
+  if(!state.hintKeys || !state.seq[state.cur]) return;
+  state.seq[state.cur].midis.forEach(t=>{
+    let m=t; if(!state.octave){ // find nearest visible same pitch class
+      m = [...Object.keys(keyByMidi)].map(Number).find(x=>x%12===t%12) ?? t; }
+    const k=keyByMidi[m]; if(k) k.classList.add('hint');
+  });
+}
+
+/* computer keyboard (desktop testing) */
+const KEYMAP={a:0,w:1,s:2,e:3,d:4,f:5,t:6,g:7,y:8,h:9,u:10,j:11,k:12,o:13,l:14};
+const pressedKeys=new Set();
+addEventListener('keydown',e=>{ if(e.repeat) return; const k=e.key.toLowerCase(); if(k in KEYMAP){ const m=midiOf('C',4)+KEYMAP[k]; pressedKeys.add(k); noteOn(m); }});
+addEventListener('keyup',e=>{ const k=e.key.toLowerCase(); if(k in KEYMAP){ const m=midiOf('C',4)+KEYMAP[k]; pressedKeys.delete(k); noteOff(m); }});
+
+/* =========================================================
+   Web MIDI
+   ========================================================= */
+let midiAccess=null, activeInput=null;
+async function connectMIDI(){
+  if(!navigator.requestMIDIAccess){ setConn(false,'הדפדפן לא תומך ב‑Web MIDI (נסה Chrome)'); return; }
+  try{
+    midiAccess = await navigator.requestMIDIAccess({sysex:false});
+    midiAccess.onstatechange = populateDevices;
+    populateDevices();
+  }catch(err){
+    setConn(false,'אין הרשאת MIDI. צריך פתיחה דרך https או localhost.');
+  }
+}
+function populateDevices(){
+  const sel=document.getElementById('midiSelect'); const prev=sel.value;
+  sel.innerHTML='';
+  const inputs=[...(midiAccess?midiAccess.inputs.values():[])];
+  if(!inputs.length){ sel.innerHTML='<option value="">— לא נמצאו מכשירים —</option>'; setConn(false,'לא מחובר — נגן במקלדת שלמטה'); return; }
+  inputs.forEach(inp=>{ const o=document.createElement('option'); o.value=inp.id; o.textContent=inp.name||inp.id; sel.appendChild(o); });
+  sel.value = inputs.some(i=>i.id===prev)?prev:inputs[0].id;
+  attachInput(sel.value);
+}
+function attachInput(id){
+  if(activeInput) activeInput.onmidimessage=null;
+  activeInput = midiAccess ? midiAccess.inputs.get(id) : null;
+  if(activeInput){ activeInput.onmidimessage=onMIDIMessage; setConn(true,'מחובר: '+(activeInput.name||id)); }
+}
+function onMIDIMessage(ev){
+  const [s,d1,d2]=ev.data, cmd=s&0xf0;
+  if(cmd===0x90 && d2>0) noteOn(d1);
+  else if(cmd===0x80 || (cmd===0x90 && d2===0)) noteOff(d1);
+}
+function setConn(on,text){
+  const chip=document.getElementById('connChip');
+  chip.className='chip '+(on?'on':'off');
+  document.getElementById('connText').textContent=text;
+}
+
+/* =========================================================
+   UI – טאבים, הגדרות, מגירה
+   ========================================================= */
+function setMode(mode){
+  state.mode=mode;
+  document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected', t.dataset.mode===mode));
+  document.querySelectorAll('.mode-only').forEach(el=>el.style.display = (el.dataset.mode===mode)?'block':'none');
+  fillRangeSelects();
+  drawStatic(); resetSeq();
+}
+document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setMode(t.dataset.mode)));
+
+/* range dropdowns */
+const ALL_NOTES=[]; for(let o=1;o<=6;o++) for(const l of LETTERS) ALL_NOTES.push(l+o);
+function fillRangeSelects(){
+  const m=state.mode;
+  const lo=document.getElementById('rangeLo'), hi=document.getElementById('rangeHi');
+  lo.innerHTML=''; hi.innerHTML='';
+  ALL_NOTES.forEach(n=>{ lo.add(new Option(n,n)); hi.add(new Option(n,n)); });
+  lo.value=state.range[m].lo; hi.value=state.range[m].hi;
+}
+document.getElementById('rangeLo').addEventListener('change',e=>{ state.range[state.mode].lo=e.target.value; resetSeq(); });
+document.getElementById('rangeHi').addEventListener('change',e=>{ state.range[state.mode].hi=e.target.value; resetSeq(); });
+
+/* settings drawer */
+const drawer=document.getElementById('drawer'), overlay=document.getElementById('overlay');
+function openSettings(){ drawer.classList.add('open'); overlay.classList.add('open'); }
+function closeSettings(){ drawer.classList.remove('open'); overlay.classList.remove('open'); }
+document.getElementById('gear').addEventListener('click',openSettings);
+document.getElementById('closeSettings').addEventListener('click',closeSettings);
+overlay.addEventListener('click',closeSettings);
+document.getElementById('midiRefresh').addEventListener('click',connectMIDI);
+document.getElementById('midiSelect').addEventListener('change',e=>attachInput(e.target.value));
+
+document.getElementById('nameStyle').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#nameStyle button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  state.nameStyle=b.dataset.v; render(false); });
+
+document.getElementById('chordQ').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b)return;
+  document.querySelectorAll('#chordQ button').forEach(x=>x.classList.remove('sel')); b.classList.add('sel');
+  state.chordQ=b.dataset.v; resetSeq(); });
+
+document.getElementById('sharpsChk').addEventListener('change',e=>{ state.sharps=e.target.checked; resetSeq(); });
+document.getElementById('octaveChk').addEventListener('change',e=>{ state.octave=e.target.checked; highlightKeys(); });
+document.getElementById('perRound').addEventListener('change',e=>{ state.perRound=Math.max(2,Math.min(40,+e.target.value||6)); state.correctInRound=0; updateProgress(); });
+document.getElementById('latchChk').addEventListener('change',e=>{ state.latch=e.target.checked; held.clear(); buildKeyboard(); });
+document.getElementById('hintKeysChk').addEventListener('change',e=>{ state.hintKeys=e.target.checked; highlightKeys(); });
+
+/* =========================================================
+   אתחול
+   ========================================================= */
+let rtO;
+addEventListener('resize',()=>{ clearTimeout(rtO); rtO=setTimeout(()=>{ drawStatic(); render(false); },120); });
+
+function init(){
+  fillRangeSelects();
+  buildKeyboard();
+  drawStatic();
+  resetSeq();
+  connectMIDI(); // will quietly fall back to keyboard if unavailable
+}
+init();
+</script>
+</body>
+</html>

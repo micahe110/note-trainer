@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>בדיקת MIDI</title>
+<style>
+  body{margin:0;background:#0E2233;color:#ECF3F4;font-family:system-ui,Arial,sans-serif;padding:16px;line-height:1.5}
+  h1{font-size:20px;margin:0 0 14px}
+  .card{background:#15334C;border:1px solid rgba(89,210,224,.2);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+  .row{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06)}
+  .row:last-child{border:none}
+  .k{color:#7E9AB0;font-size:14px}
+  .v{font-weight:700;font-size:14px;text-align:end}
+  .ok{color:#4FD08A}.bad{color:#FF5A4D}.warn{color:#F4B740}
+  button{width:100%;background:#59D2E0;color:#06222b;border:none;border-radius:10px;padding:14px;font-size:16px;font-weight:800;margin:8px 0}
+  #log{background:#0B1B2A;border-radius:10px;padding:10px;height:150px;overflow:auto;font-family:monospace;font-size:13px;white-space:pre-wrap}
+  .dev{background:#1B405E;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:14px}
+  .hint{color:#7E9AB0;font-size:13px}
+</style>
+</head>
+<body>
+  <h1>בדיקת חיבור MIDI</h1>
+
+  <div class="card">
+    <div class="row"><span class="k">כתובת הדף (פרוטוקול)</span><span class="v" id="proto"></span></div>
+    <div class="row"><span class="k">הקשר מאובטח (secure context)</span><span class="v" id="secure"></span></div>
+    <div class="row"><span class="k">הדפדפן תומך ב‑Web MIDI</span><span class="v" id="support"></span></div>
+    <div class="row"><span class="k">דפדפן</span><span class="v" id="ua"></span></div>
+  </div>
+
+  <button id="ask">בקש גישת MIDI</button>
+
+  <div class="card">
+    <div class="k" style="margin-bottom:6px">מכשירים שזוהו:</div>
+    <div id="devices"><span class="hint">עדיין לא ביקשת גישה</span></div>
+  </div>
+
+  <div class="card">
+    <div class="k" style="margin-bottom:6px">צלילים נכנסים (נגן תו בפסנתר):</div>
+    <div id="log"></div>
+  </div>
+
+<script>
+const NOTE=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const $=id=>document.getElementById(id);
+function set(id,txt,cls){ const e=$(id); e.textContent=txt; e.className='v '+(cls||''); }
+function log(t){ const l=$('log'); l.textContent += t+'\n'; l.scrollTop=l.scrollHeight; }
+
+// 1) basic environment
+const proto=location.protocol.replace(':','');
+set('proto', proto, proto==='https'?'ok':(proto==='file'?'bad':'warn'));
+set('secure', window.isSecureContext?'כן':'לא — חובה https/localhost', window.isSecureContext?'ok':'bad');
+const hasMIDI = !!navigator.requestMIDIAccess;
+set('support', hasMIDI?'כן':'לא — השתמש ב‑Chrome', hasMIDI?'ok':'bad');
+const ua=navigator.userAgent;
+let br='אחר'; if(/SamsungBrowser/.test(ua)) br='Samsung Internet'; else if(/Edg/.test(ua)) br='Edge'; else if(/Chrome/.test(ua)) br='Chrome'; else if(/Firefox/.test(ua)) br='Firefox (לא נתמך)';
+set('ua', br, /Chrome|Edg|SamsungBrowser/.test(ua)?'ok':'bad');
+
+let access=null;
+function renderDevices(){
+  const d=$('devices');
+  if(!access){ d.innerHTML='<span class="hint">עדיין לא ביקשת גישה</span>'; return; }
+  const inputs=[...access.inputs.values()];
+  if(!inputs.length){ d.innerHTML='<span class="bad">לא נמצא אף מכשיר. בדוק כבל/יציאת USB‑to‑Host, והדלקת הפסנתר.</span>'; return; }
+  d.innerHTML='';
+  inputs.forEach(inp=>{
+    const div=document.createElement('div'); div.className='dev';
+    div.innerHTML='🎹 <b>'+(inp.name||inp.id)+'</b><br><span class="hint">'+(inp.manufacturer||'')+' · מצב: '+inp.state+' / '+inp.connection+'</span>';
+    d.appendChild(div);
+    inp.onmidimessage=e=>{
+      const [s,a,b]=e.data, cmd=s&0xf0;
+      if(cmd===0x90&&b>0) log('▶ NOTE ON  '+NOTE[a%12]+(Math.floor(a/12)-1)+'  vel '+b);
+      else if(cmd===0x80||(cmd===0x90&&b===0)) log('◼ note off '+NOTE[a%12]+(Math.floor(a/12)-1));
+    };
+  });
+}
+
+$('ask').addEventListener('click', async ()=>{
+  if(!hasMIDI){ log('הדפדפן לא תומך ב‑Web MIDI. פתח ב‑Chrome.'); return; }
+  try{
+    access = await navigator.requestMIDIAccess({sysex:false});
+    log('✓ גישת MIDI ניתנה. מכשירים: '+[...access.inputs.values()].length);
+    access.onstatechange=ev=>{ log('שינוי מצב: '+(ev.port.name||'')+' → '+ev.port.state); renderDevices(); };
+    renderDevices();
+  }catch(err){
+    log('✗ נכשל: '+err.name+' — '+err.message);
+    log('סיבה נפוצה: הדף לא נפתח דרך https, או שאין הרשאה.');
+  }
+});
+</script>
+</body>
+</html>
