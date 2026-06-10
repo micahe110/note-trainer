@@ -79,10 +79,13 @@ select,input[type=number]{width:100%;background:var(--panel);color:var(--uiink);
 .mode-only{display:none}
 hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
 
-@media (max-height:520px){
-  header{padding:6px 12px}.brand{font-size:15px}.statusbar{padding:4px 12px}
-  .progress{margin:6px 18px 2px}.kbdbar{padding:4px 8px 6px}.kbdtools{display:none}
+@media (max-height:560px){
+  header{padding:5px 12px}.brand{font-size:15px}
+  .statusbar{padding:2px 12px}.chip{font-size:11px;padding:3px 8px}.feedback{font-size:12px;min-height:14px}
   .staffwrap{margin:0 6px}
+  .progress{height:5px;margin:4px 14px 1px}.roundinfo{font-size:11px;margin:0 14px}
+  .kbdbar{padding:3px 8px 5px}.kbdtools{display:none}
+  .keys{height:clamp(46px,12vh,74px)}
 }
 </style>
 </head>
@@ -393,7 +396,7 @@ function buildKeyboardWindow(lo,hi){
     const k=document.createElement('div');k.className='bkey';k.style.left=(idx*ww+ww*0.65)+'px';k.style.width=(ww*0.7)+'px';
     k.dataset.midi=m;bindKey(k,m);keysEl.appendChild(k);keyByMidi[m]=k;}
 }
-function kbOctaves(){const cw=(document.querySelector('.kbdscroll').clientWidth)||window.innerWidth||700;return Math.max(2,Math.min(4,Math.round(cw/322)));}
+function kbOctaves(){const cw=Math.max((document.querySelector('.kbdscroll').clientWidth)||0,window.innerWidth||700);return Math.max(2,Math.min(5,Math.round(cw/300)));}
 function windowFor(midis){
   const span=kbOctaves()*12;
   const tmin=Math.min(...midis),tmax=Math.max(...midis),mid=(tmin+tmax)/2;
