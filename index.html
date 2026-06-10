@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 <meta name="theme-color" content="#0E2233">
+<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="מאמן תווים">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
 <title>מאמן תווים — פסנתר</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
@@ -99,6 +106,7 @@ hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
     <button class="tab" data-mode="bass"   role="tab" aria-selected="false">מפתח פה</button>
     <button class="tab" data-mode="chords" role="tab" aria-selected="false">אקורדים</button>
   </div>
+  <button class="iconbtn" id="fsBtn" aria-label="מסך מלא">⛶</button>
   <button class="iconbtn" id="gear" aria-label="הגדרות">⚙︎</button>
 </header>
 
@@ -439,6 +447,24 @@ function attachInput(id){if(activeInput)activeInput.onmidimessage=null;activeInp
   if(activeInput){activeInput.onmidimessage=onMIDI;setConn(true,'מחובר: '+(activeInput.name||id));}}
 function onMIDI(ev){const[s,d1,d2]=ev.data,cmd=s&0xf0;if(cmd===0x90&&d2>0)noteOn(d1);else if(cmd===0x80||(cmd===0x90&&d2===0))noteOff(d1);}
 function setConn(on,t){const c=document.getElementById('connChip');c.className='chip '+(on?'on':'off');document.getElementById('connText').textContent=t;}
+
+/* ===== fullscreen ===== */
+function fsElement(){return document.fullscreenElement||document.webkitFullscreenElement;}
+function toggleFullscreen(){
+  const el=document.documentElement;
+  if(!fsElement()){
+    const r=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(r){r.call(el).catch(()=>{});}
+  }else{
+    const x=document.exitFullscreen||document.webkitExitFullscreen;
+    if(x)x.call(document);
+  }
+}
+document.getElementById('fsBtn').addEventListener('click',toggleFullscreen);
+// if launched as an installed app (standalone/fullscreen), hide the in-app button
+if(window.matchMedia('(display-mode:fullscreen)').matches||window.matchMedia('(display-mode:standalone)').matches||navigator.standalone){
+  document.getElementById('fsBtn').style.display='none';
+}
 
 /* ===== UI ===== */
 function setMode(mode){state.mode=mode;
