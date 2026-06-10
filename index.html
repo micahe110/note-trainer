@@ -91,6 +91,7 @@ hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
 <header>
   <div class="brand">מאמן <b>תווים</b></div>
   <div class="tabs" role="tablist">
+    <button class="tab" data-mode="beginners" role="tab" aria-selected="false">מתחילים</button>
     <button class="tab" data-mode="treble" role="tab" aria-selected="true">מפתח סול</button>
     <button class="tab" data-mode="bass"   role="tab" aria-selected="false">מפתח פה</button>
     <button class="tab" data-mode="chords" role="tab" aria-selected="false">אקורדים</button>
@@ -137,7 +138,13 @@ hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
 
   <hr class="div">
 
-  <div class="field">
+  <div class="field mode-only" data-mode="beginners">
+    <label>מתחילים — בחר אילו תווים ללמוד (דו עד דו)</label>
+    <div class="seg" id="begNotes"></div>
+    <div class="hint">לחץ כדי לכבות/להדליק תו. רק התווים המודלקים יופיעו בתרגול.</div>
+  </div>
+
+  <div class="field" id="rangeField">
     <label>טווח תווים</label>
     <div class="row2">
       <div><div class="hint" style="margin:0 0 4px">מהנמוך</div><select id="rangeLo"></select></div>
@@ -145,7 +152,7 @@ hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
     </div>
   </div>
 
-  <div class="field row2">
+  <div class="field row2" id="keyScaleField">
     <div><label>טוניקה (מפתח)</label><select id="keySel"></select></div>
     <div><label>סולם / מנגינה</label><select id="scaleSel"></select></div>
   </div>
@@ -214,7 +221,8 @@ const STYLE_QUAL={basic:['maj','min'],classic:['maj','min','dim','aug'],pop:['ma
 /* ===== state ===== */
 const state={
   mode:'treble',
-  range:{treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C4',hi:'C5'}},
+  range:{treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C4',hi:'C5'},beginners:{lo:'C4',hi:'C5'}},
+  beginnerNotes:[60,62,64,65,67,69,71,72],
   key:0, scale:'free', chordStyle:'classic',
   nameStyle:'solfege', sharps:false, octave:true, perRound:6, zoom:1.1,
   latch:false, hintKeys:true,
@@ -223,7 +231,7 @@ const state={
 const TOPDPOS={treble:38,bass:26};
 
 /* ===== persistence (works when hosted; ignored in sandbox) ===== */
-function save(){try{localStorage.setItem('noteTrainer',JSON.stringify({range:state.range,key:state.key,scale:state.scale,chordStyle:state.chordStyle,nameStyle:state.nameStyle,sharps:state.sharps,octave:state.octave,perRound:state.perRound,zoom:state.zoom,hintKeys:state.hintKeys}));}catch(e){}}
+function save(){try{localStorage.setItem('noteTrainer',JSON.stringify({range:state.range,beginnerNotes:state.beginnerNotes,key:state.key,scale:state.scale,chordStyle:state.chordStyle,nameStyle:state.nameStyle,sharps:state.sharps,octave:state.octave,perRound:state.perRound,zoom:state.zoom,hintKeys:state.hintKeys}));}catch(e){}}
 function load(){try{const s=JSON.parse(localStorage.getItem('noteTrainer'));if(s)Object.assign(state,s);}catch(e){}}
 
 /* ===== generation ===== */
@@ -256,7 +264,13 @@ function genChord(){
   const label=PC_NAMES[pc(rootMidi)]+spec.sfx;
   return{type:'chord',glyphs,midis,label};
 }
-function genNote(){return state.mode==='chords'?genChord():genSingle();}
+function genBeginner(){
+  let pool=state.beginnerNotes&&state.beginnerNotes.length?state.beginnerNotes:[60,62,64,65,67,69,71,72];
+  const m=pool[rint(0,pool.length-1)],g=spell(m);
+  return{type:'note',glyphs:[g],midis:[g.midi],label:nameFor(g)};
+}
+function genNote(){return state.mode==='chords'?genChord():state.mode==='beginners'?genBeginner():genSingle();}
+const clefMode=()=>state.mode==='bass'?'bass':'treble';
 function nameFor(g){if(state.nameStyle==='off')return'';const b=state.nameStyle==='solfege'?SOLFEGE[g.l]:g.l;return b+(g.a?'♯':'');}
 
 function refill(){const need=state.cur+lookahead()+3;while(state.seq.length<need)state.seq.push(genNote());}
@@ -284,7 +298,7 @@ function layout(){
 }
 function lookahead(){return Math.max(2,Math.floor((W-readingX)/spacing));}
 const lineY=i=>STAFF_TOP+i*GAP;
-const yForDpos=d=>STAFF_TOP+(TOPDPOS[state.mode==='chords'?'treble':state.mode]-d)*STEP;
+const yForDpos=d=>STAFF_TOP+(TOPDPOS[clefMode()]-d)*STEP;
 function el(t,a){const e=document.createElementNS(SVG,t);for(const k in a)e.setAttribute(k,a[k]);return e;}
 
 function ledgersFor(g,x,parent){
@@ -426,7 +440,29 @@ function setConn(on,t){const c=document.getElementById('connChip');c.className='
 function setMode(mode){state.mode=mode;
   document.querySelectorAll('.tab').forEach(t=>t.setAttribute('aria-selected',t.dataset.mode===mode));
   document.querySelectorAll('.mode-only').forEach(e=>e.style.display=(e.dataset.mode===mode)?'block':'none');
+  const beg=mode==='beginners';
+  document.getElementById('rangeField').style.display=beg?'none':'';
+  document.getElementById('keyScaleField').style.display=beg?'none':'';
+  if(beg)renderBeginnerPicker();
   fillRangeSelects();drawStatic();resetSeq();}
+
+function renderBeginnerPicker(){
+  const wrap=document.getElementById('begNotes');wrap.innerHTML='';
+  const octave=[['C',4],['D',4],['E',4],['F',4],['G',4],['A',4],['B',4],['C',5]];
+  octave.forEach(([l,o])=>{
+    const m=midiOf(l,o),b=document.createElement('button');
+    const on=state.beginnerNotes.includes(m);b.className=on?'sel':'';
+    b.textContent=(state.nameStyle==='letters'?l:SOLFEGE[l])+(o===5?'׳':'');
+    b.dataset.midi=m;
+    b.addEventListener('click',()=>{
+      const i=state.beginnerNotes.indexOf(m);
+      if(i>=0){if(state.beginnerNotes.length>1)state.beginnerNotes.splice(i,1);}
+      else state.beginnerNotes.push(m);
+      state.beginnerNotes.sort((a,b)=>a-b);save();renderBeginnerPicker();resetSeq();
+    });
+    wrap.appendChild(b);
+  });
+}
 document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>setMode(t.dataset.mode)));
 
 const ALL_NOTES=[];for(let o=1;o<=6;o++)for(const l of LETTERS)ALL_NOTES.push(l+o);
@@ -445,7 +481,7 @@ document.getElementById('scaleSel').addEventListener('change',e=>{state.scale=e.
 function segWire(id,key,after){document.getElementById(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');state[key]=b.dataset.v;save();after&&after();});}
 segWire('chordStyle','chordStyle',resetSeq);
-segWire('nameStyle','nameStyle',()=>render(false));
+segWire('nameStyle','nameStyle',()=>{if(state.mode==='beginners')renderBeginnerPicker();render(false);});
 
 const drawer=document.getElementById('drawer'),overlay=document.getElementById('overlay');
 document.getElementById('gear').addEventListener('click',()=>{drawer.classList.add('open');overlay.classList.add('open');});
