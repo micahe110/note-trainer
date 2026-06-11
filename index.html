@@ -177,8 +177,20 @@ hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
       <button data-v="pop">פופ</button>
       <button data-v="blues">בלוז</button>
       <button data-v="jazz">ג'אז</button>
+      <button data-v="custom">מותאם</button>
     </div>
     <div class="hint">שמות האקורדים (A, Bm, Cmaj7…) מוצגים מעל כל אקורד.</div>
+  </div>
+
+  <div class="field mode-only" id="customBuilder" data-mode="chords" style="display:none">
+    <label>בניית אקורדים לתרגול (היצירה שלך)</label>
+    <div class="seg" id="customRoot" style="flex-wrap:wrap"></div>
+    <div class="row2" style="margin-top:8px">
+      <select id="customType"></select>
+      <button id="addChord" style="width:auto;padding:0 18px;background:var(--cyan);color:#06222b;border:none;border-radius:10px;font-family:inherit;font-weight:800;cursor:pointer">הוסף</button>
+    </div>
+    <div id="customList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px"></div>
+    <div class="hint">בחר שורש + סוג → "הוסף". התרגול יעבור על האקורדים שבחרת לפי הסדר, שוב ושוב.</div>
   </div>
 
   <hr class="div">
@@ -223,10 +235,16 @@ const SCALE_LABELS={free:'חופשי (כל התווים)',major:'מז׳ור',min
 
 const QUAL={
   maj:{iv:[0,4,7],sfx:''}, min:{iv:[0,3,7],sfx:'m'}, dim:{iv:[0,3,6],sfx:'dim'}, aug:{iv:[0,4,8],sfx:'aug'},
-  sus4:{iv:[0,5,7],sfx:'sus4'}, add9:{iv:[0,4,7,14],sfx:'add9'},
+  sus2:{iv:[0,2,7],sfx:'sus2'}, sus4:{iv:[0,5,7],sfx:'sus4'},
+  '6':{iv:[0,4,7,9],sfx:'6'}, m6:{iv:[0,3,7,9],sfx:'m6'}, add9:{iv:[0,4,7,14],sfx:'add9'},
   dom7:{iv:[0,4,7,10],sfx:'7'}, maj7:{iv:[0,4,7,11],sfx:'maj7'}, min7:{iv:[0,3,7,10],sfx:'m7'},
-  m7b5:{iv:[0,3,6,10],sfx:'m7♭5'}, dim7:{iv:[0,3,6,9],sfx:'°7'}
+  mMaj7:{iv:[0,3,7,11],sfx:'mMaj7'}, m7b5:{iv:[0,3,6,10],sfx:'m7♭5'}, dim7:{iv:[0,3,6,9],sfx:'°7'},
+  aug7:{iv:[0,4,8,10],sfx:'7♯5'}, '7b5':{iv:[0,4,6,10],sfx:'7♭5'}, '7sus4':{iv:[0,5,7,10],sfx:'7sus4'},
+  '9':{iv:[0,4,7,10,14],sfx:'9'}, maj9:{iv:[0,4,7,11,14],sfx:'maj9'}, m9:{iv:[0,3,7,10,14],sfx:'m9'}
 };
+const CHORD_TYPES=[['maj','Major'],['min','Minor m'],['dim','Dim °'],['aug','Aug +'],['sus2','sus2'],['sus4','sus4'],
+  ['6','6'],['m6','m6'],['add9','add9'],['dom7','7'],['maj7','maj7'],['min7','m7'],['mMaj7','mMaj7'],
+  ['m7b5','m7♭5 (ø)'],['dim7','°7'],['aug7','7♯5'],['7b5','7♭5'],['7sus4','7sus4'],['9','9'],['maj9','maj9'],['m9','m9']];
 const STYLE_QUAL={basic:['maj','min'],classic:['maj','min','dim','aug'],pop:['maj','min','sus4','add9'],
   blues:['dom7','min7'],jazz:['maj7','min7','dom7','m7b5','dim7']};
 
@@ -259,12 +277,13 @@ const state={
   nameStyle:'solfege', sharps:false, octave:true, perRound:6, zoom:1.0,
   latch:false, hintKeys:true,
   chordProg:[], progPos:0, scaleWalk:[], walkPos:0,
+  customChords:[], customRootSel:0,
   seq:[], cur:0, wrong:false, correctInRound:0, round:1
 };
 const TOPDPOS={treble:38,bass:26};
 
 /* ===== persistence (works when hosted; ignored in sandbox) ===== */
-function save(){try{localStorage.setItem('noteTrainer',JSON.stringify({range:state.range,beginnerNotes:state.beginnerNotes,key:state.key,scale:state.scale,chordStyle:state.chordStyle,nameStyle:state.nameStyle,sharps:state.sharps,octave:state.octave,perRound:state.perRound,zoom:state.zoom,hintKeys:state.hintKeys}));}catch(e){}}
+function save(){try{localStorage.setItem('noteTrainer',JSON.stringify({range:state.range,beginnerNotes:state.beginnerNotes,key:state.key,scale:state.scale,chordStyle:state.chordStyle,customChords:state.customChords,nameStyle:state.nameStyle,sharps:state.sharps,octave:state.octave,perRound:state.perRound,zoom:state.zoom,hintKeys:state.hintKeys}));}catch(e){}}
 function load(){try{const s=JSON.parse(localStorage.getItem('noteTrainer'));if(s){
   const dr={treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C4',hi:'C5'},beginners:{lo:'C4',hi:'C5'}};
   Object.assign(state,s);
@@ -305,6 +324,10 @@ function buildScaleWalk(){
 let prevChordRoot=null;
 function buildChordProg(){
   state.progPos=0; prevChordRoot=null;
+  if(state.chordStyle==='custom'){
+    state.chordProg=state.customChords.map(c=>({deg:'CUSTOM',root:c.root,qual:c.qual}));
+    return;
+  }
   const progs=PROG[state.chordStyle]||PROG.basic,flat=[];
   progs.forEach(p=>p.forEach(([deg,qual])=>flat.push({deg,qual})));
   state.chordProg=flat;
@@ -312,7 +335,8 @@ function buildChordProg(){
 function genChord(){
   if(state.chordProg&&state.chordProg.length){
     const e=state.chordProg[state.progPos%state.chordProg.length];state.progPos++;
-    const base=60+((state.key+DEG[e.deg])%12);
+    const basePc=e.deg==='CUSTOM'?e.root:((state.key+DEG[e.deg])%12);
+    const base=60+basePc;
     let cands=[base-12,base,base+12].filter(c=>c>=55&&c<=67); if(!cands.length)cands=[base-12,base].filter(c=>c>=48);if(!cands.length)cands=[base];
     let rootMidi=cands[0];
     if(prevChordRoot!=null)cands.forEach(c=>{if(Math.abs(c-prevChordRoot)<Math.abs(rootMidi-prevChordRoot))rootMidi=c;});
@@ -325,7 +349,7 @@ function genChord(){
   const mLo=midiOf(lo.l,lo.o),mHi=midiOf(hi.l,hi.o);
   const c=[];for(let x=mLo;x<=mHi;x++)if(pc(x)%2!==1)c.push(x);
   const rootMidi=c.length?c[rint(0,c.length-1)]:mLo;
-  const pool=STYLE_QUAL[state.chordStyle],q=pool[rint(0,pool.length-1)],spec=QUAL[q];
+  const pool=STYLE_QUAL[state.chordStyle]||['maj','min'],q=pool[rint(0,pool.length-1)],spec=QUAL[q];
   const midis=spec.iv.map(iv=>rootMidi+iv),glyphs=midis.map(spell);
   return{type:'chord',glyphs,midis,label:PC_NAMES[pc(rootMidi)]+spec.sfx};
 }
@@ -511,9 +535,15 @@ addEventListener('keyup',e=>{const k=e.key.toLowerCase();if(k in KEYMAP)noteOff(
 let midiAccess=null,activeInput=null;
 async function connectMIDI(){
   if(!navigator.requestMIDIAccess){setConn(false,'הדפדפן לא תומך ב‑Web MIDI (Chrome)');return;}
-  try{midiAccess=await navigator.requestMIDIAccess({sysex:false});midiAccess.onstatechange=populateDevices;populateDevices();}
-  catch(e){setConn(false,'אין הרשאת MIDI. צריך https.');}
+  try{
+    if(!midiAccess){midiAccess=await navigator.requestMIDIAccess({sysex:false});midiAccess.onstatechange=populateDevices;}
+    populateDevices();
+  }catch(e){
+    if(e&&e.name==='InvalidStateError')setConn(false,'MIDI תפוס — סגור טאבים אחרים או Force stop ל‑Chrome');
+    else setConn(false,'אין הרשאת MIDI. צריך https.');
+  }
 }
+addEventListener('pagehide',()=>{try{if(activeInput)activeInput.onmidimessage=null;if(bleDevice&&bleDevice.gatt&&bleDevice.gatt.connected)bleDevice.gatt.disconnect();}catch(e){}});
 function populateDevices(){const sel=document.getElementById('midiSelect'),prev=sel.value;sel.innerHTML='';
   const inputs=[...(midiAccess?midiAccess.inputs.values():[])];
   if(!inputs.length){sel.innerHTML='<option value="">— לא נמצאו מכשירים —</option>';setConn(false,'לא מחובר — נגן במקלדת שלמטה');return;}
@@ -591,7 +621,27 @@ function setMode(mode){state.mode=mode;
   document.getElementById('rangeField').style.display=beg?'none':'';
   document.getElementById('keyScaleField').style.display=beg?'none':'';
   if(beg)renderBeginnerPicker();
+  updCustomVis();
   fillRangeSelects();buildKeyboard();drawStatic();resetSeq();}
+
+function updCustomVis(){document.getElementById('customBuilder').style.display=(state.mode==='chords'&&state.chordStyle==='custom')?'block':'none';}
+function fillCustomType(){const s=document.getElementById('customType');s.innerHTML='';CHORD_TYPES.forEach(([k,lbl])=>s.add(new Option(lbl,k)));}
+function renderCustomRoots(){const w=document.getElementById('customRoot');w.innerHTML='';
+  PC_NAMES.forEach((n,i)=>{const b=document.createElement('button');b.textContent=n;b.className=(i===state.customRootSel)?'sel':'';
+    b.addEventListener('click',()=>{state.customRootSel=i;renderCustomRoots();});w.appendChild(b);});}
+function renderCustomList(){const w=document.getElementById('customList');w.innerHTML='';
+  if(!state.customChords.length){w.innerHTML='<span class="hint">עדיין לא נוספו אקורדים</span>';return;}
+  state.customChords.forEach((c,idx)=>{const spec=QUAL[c.qual]||QUAL.maj;
+    const chip=document.createElement('button');chip.style.cssText='background:var(--panel2);color:var(--uiink);border:1px solid rgba(89,210,224,.3);border-radius:999px;padding:6px 12px;font-family:inherit;font-weight:700;font-size:13px;cursor:pointer';
+    chip.textContent=PC_NAMES[c.root]+spec.sfx+'  ✕';
+    chip.addEventListener('click',()=>{state.customChords.splice(idx,1);save();renderCustomList();resetSeq();});
+    w.appendChild(chip);});}
+document.getElementById('addChord').addEventListener('click',()=>{
+  state.customChords.push({root:state.customRootSel,qual:document.getElementById('customType').value});
+  save();renderCustomList();resetSeq();});
+document.getElementById('chordStyle').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('#chordStyle button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');
+  state.chordStyle=b.dataset.v;save();updCustomVis();resetSeq();});
 
 function renderBeginnerPicker(){
   const wrap=document.getElementById('begNotes');wrap.innerHTML='';
@@ -627,7 +677,6 @@ document.getElementById('scaleSel').addEventListener('change',e=>{state.scale=e.
 
 function segWire(id,key,after){document.getElementById(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;
   document.querySelectorAll('#'+id+' button').forEach(x=>x.classList.remove('sel'));b.classList.add('sel');state[key]=b.dataset.v;save();after&&after();});}
-segWire('chordStyle','chordStyle',resetSeq);
 segWire('nameStyle','nameStyle',()=>{if(state.mode==='beginners')renderBeginnerPicker();render(false);});
 
 const drawer=document.getElementById('drawer'),overlay=document.getElementById('overlay');
@@ -656,6 +705,7 @@ function init(){
   fillRangeSelects();fillKeyScale();
   document.querySelectorAll('#nameStyle button').forEach(b=>b.classList.toggle('sel',b.dataset.v===state.nameStyle));
   document.querySelectorAll('#chordStyle button').forEach(b=>b.classList.toggle('sel',b.dataset.v===state.chordStyle));
+  fillCustomType();renderCustomRoots();renderCustomList();updCustomVis();
   buildKeyboard();drawStatic();resetSeq();connectMIDI();
 }
 init();
