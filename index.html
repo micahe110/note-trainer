@@ -380,7 +380,7 @@ function drawStatic(){
   clip.appendChild(el('rect',{x:clefW,y:0,width:W,height:H}));defs.appendChild(clip);staff.appendChild(defs);
   for(let i=0;i<5;i++)staff.appendChild(el('line',{x1:10,x2:W-6,y1:lineY(i),y2:lineY(i),stroke:COL.line,'stroke-width':1.4}));
   const bass=state.mode==='bass';
-  const cy=bass?lineY(1)+GAP*1.15:lineY(2)+GAP*1.4;
+  const cy=bass?lineY(1)+GAP*2.1:lineY(2)+GAP*1.4;
   const c=el('text',{x:GAP*0.7,y:cy,'font-size':bass?GAP*3.5:GAP*5.2,fill:COL.ink});
   c.textContent=bass?'\uD834\uDD22':'\uD834\uDD1E';staff.appendChild(c);
   staff.appendChild(el('g',{id:'notes','clip-path':'url(#nc)'}));
@@ -433,7 +433,8 @@ function drawItem(g,it,x,fill,active){
   if(it.type==='chord'){
     const t=el('text',{x,y:GAP*1.5,'text-anchor':'middle','font-size':GAP*1.0,'font-weight':800,fill,'font-family':"'JetBrains Mono',monospace"});t.textContent=it.label;g.appendChild(t);
   }else if(state.nameStyle!=='off'&&it.label){
-    const t=el('text',{x,y:lineY(4)+GAP*2.0,'text-anchor':'middle','font-size':GAP*0.95,'font-weight':700,fill:active?fill:COL.done,'font-family':"'JetBrains Mono',monospace"});t.textContent=it.label;g.appendChild(t);
+    const ly=Math.max(lineY(4)+GAP*1.6, yBot+GAP*1.8);
+    const t=el('text',{x,y:ly,'text-anchor':'middle','font-size':GAP*0.95,'font-weight':700,fill:active?fill:COL.done,'font-family':"'Heebo',sans-serif"});t.textContent=it.label;g.appendChild(t);
   }
 }
 function drawCursor(g,bStart,N){
