@@ -127,6 +127,7 @@ hr.div{border:none;border-top:1px solid rgba(89,210,224,.15);margin:18px 0}
 <div class="kbdbar">
   <div class="kbdtools">
     <label class="toggle"><input type="checkbox" id="latchChk"> מצב נעילה (אקורדים בעכבר)</label>
+    <label class="toggle"><input type="checkbox" id="full88Chk"> פסנתר מלא (88)</label>
     <label class="toggle" style="margin-inline-start:auto"><input type="checkbox" id="hintKeysChk" checked> הדגש קליד נכון</label>
   </div>
   <div class="kbdscroll"><div class="keys" id="keys"></div></div>
@@ -275,7 +276,7 @@ const state={
   beginnerNotes:[60,62,64,65,67,69,71,72],
   key:0, scale:'free', chordStyle:'classic',
   nameStyle:'solfege', sharps:false, octave:true, perRound:6, zoom:1.0,
-  latch:false, hintKeys:true,
+  latch:false, hintKeys:true, full88:false,
   chordProg:[], progPos:0, scaleWalk:[], walkPos:0,
   customChords:[], customRootSel:0,
   seq:[], cur:0, wrong:false, correctInRound:0, round:1
@@ -283,7 +284,7 @@ const state={
 const TOPDPOS={treble:38,bass:26};
 
 /* ===== persistence (works when hosted; ignored in sandbox) ===== */
-function save(){try{localStorage.setItem('noteTrainer',JSON.stringify({range:state.range,beginnerNotes:state.beginnerNotes,key:state.key,scale:state.scale,chordStyle:state.chordStyle,customChords:state.customChords,nameStyle:state.nameStyle,sharps:state.sharps,octave:state.octave,perRound:state.perRound,zoom:state.zoom,hintKeys:state.hintKeys}));}catch(e){}}
+function save(){try{localStorage.setItem('noteTrainer',JSON.stringify({range:state.range,beginnerNotes:state.beginnerNotes,key:state.key,scale:state.scale,chordStyle:state.chordStyle,customChords:state.customChords,nameStyle:state.nameStyle,sharps:state.sharps,octave:state.octave,perRound:state.perRound,zoom:state.zoom,hintKeys:state.hintKeys,full88:state.full88}));}catch(e){}}
 function load(){try{const s=JSON.parse(localStorage.getItem('noteTrainer'));if(s){
   const dr={treble:{lo:'C4',hi:'G5'},bass:{lo:'C2',hi:'C4'},chords:{lo:'C4',hi:'C5'},beginners:{lo:'C4',hi:'C5'}};
   Object.assign(state,s);
@@ -499,6 +500,7 @@ const keysEl=document.getElementById('keys'),keyByMidi={};
 const isBlack=m=>[1,3,6,8,10].includes(pc(m));
 function whiteCount(lo,hi){let n=0;for(let m=lo;m<=hi;m++)if(!isBlack(m))n++;return n;}
 function kbRange(){
+  if(state.full88)return{lo:21,hi:108};
   let lo,hi;
   if(state.mode==='beginners'){lo=60;hi=72;}
   else{const r=state.range[state.mode];lo=midiOf(parseNote(r.lo).l,parseNote(r.lo).o);hi=midiOf(parseNote(r.hi).l,parseNote(r.hi).o);}
@@ -701,6 +703,7 @@ document.getElementById('sharpsChk').addEventListener('change',e=>{state.sharps=
 document.getElementById('octaveChk').addEventListener('change',e=>{state.octave=e.target.checked;save();highlightTarget();});
 document.getElementById('perRound').addEventListener('change',e=>{state.perRound=Math.max(2,Math.min(40,+e.target.value||6));state.correctInRound=0;save();updateProgress();});
 document.getElementById('latchChk').addEventListener('change',e=>{state.latch=e.target.checked;held.clear();});
+document.getElementById('full88Chk').addEventListener('change',e=>{state.full88=e.target.checked;save();buildKeyboard();highlightTarget();});
 document.getElementById('hintKeysChk').addEventListener('change',e=>{state.hintKeys=e.target.checked;save();highlightTarget();});
 document.getElementById('zoomIn').addEventListener('click',()=>{state.zoom=Math.min(2.6,state.zoom+0.2);save();render(false);});
 document.getElementById('zoomOut').addEventListener('click',()=>{state.zoom=Math.max(0.6,state.zoom-0.2);save();render(false);});
@@ -713,6 +716,7 @@ function init(){
   document.getElementById('octaveChk').checked=state.octave;
   document.getElementById('sharpsChk').checked=state.sharps;
   document.getElementById('hintKeysChk').checked=state.hintKeys;
+  document.getElementById('full88Chk').checked=state.full88;
   document.getElementById('perRound').value=state.perRound;
   fillRangeSelects();fillKeyScale();
   document.querySelectorAll('#nameStyle button').forEach(b=>b.classList.toggle('sel',b.dataset.v===state.nameStyle));
